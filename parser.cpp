@@ -173,7 +173,9 @@ void http_parser_init(Httpparser *parser, Http_method method){
 
 };
 
-// switch 문으로 바꿔?
+
+/*
+여긴 switch 문으로 바꿔
 Http_method parser_http_method(const std::string& method) {
     if (method == "GET") {
         return Http_method::GET;
@@ -198,7 +200,50 @@ Http_method parser_http_method(const std::string& method) {
         return Http_method::UNDEFINED;
     }
 }
+*/
 
+
+Http_method parser_http_method(const std::string& method) {
+    switch (method[0]) {
+        case 'G':
+            return Http_method::GET;
+        case 'P':
+            if (method == "POST") {
+                return Http_method::POST;
+            } else if (method == "PUT") {
+                return Http_method::PUT;
+            } else if (method == "PATCH") {
+                return Http_method::PATCH;
+            }
+            break;
+        case 'D':
+            if (method == "DELETE") {
+                return Http_method::DELETE;
+            }
+            break;
+        case 'H':
+            if (method == "HEAD") {
+                return Http_method::HEAD;
+            }
+            break;
+        case 'O':
+            if (method == "OPTIONS") {
+                return Http_method::OPTIONS;
+            }
+            break;
+        case 'C':
+            if (method == "CONNECT") {
+                return Http_method::CONNECT;
+            }
+            break;
+        case 'T':
+            if (method == "TRACE") {
+                return Http_method::TRACE;
+            }
+            break;
+    }
+    return Http_method::UNDEFINED;
+}
 
 // 메시지가 오면 startline, header, body 나누는 함수
 void httpdivide(Httpparser& parser, const char *data, std::string& startLine, std::vector<std::string>& headers, std::string& bodydata) {
@@ -316,6 +361,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
         // headers 벡터를 파싱
         const char *header_start = data;
+      
         while (header_start < message_end) {
             const char *line_end = strstr(header_start, "\r\n");
             if (line_end == nullptr) {
@@ -348,6 +394,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
             if (header_field == "Transfer-Encoding") {
                 transferencoding = header_value;
             }
+          
             // Content-Length 헤더
             if (header_field == "Content-Length") {
                 contentLength = std::stoul(header_value);
@@ -355,7 +402,6 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
             // 헤더 파싱이 끝나면 바디 파싱
             parser->state = Httpparserstate::BODY;
-
 
             if(header_field == "Content-Length"){
                 if(contentLength > 0) {
@@ -369,6 +415,8 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
                     return -1;
                 }
             }
+
+              
             else if(header_field == "Transfer-Encoding"){
                 if(transferencoding == "chunked") {
                     // chunked 인코딩을 사용하는 경우 각 청크를 파싱
@@ -400,7 +448,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
             parser->method == Http_method::OPTIONS) &&
             contentLength > 0) {
             Errorhandle(parser, HPE_INVALID_CONTENT_LENGTH); }
-        //바디 없을때, 예를 들어 head나,,, 이런 method
+        //바디 없을 때, 예를 들어 head나,,, 이런 method
       
         std::cout << "Body:" << std::endl;
         std::cout << bodydata << std::endl;
@@ -408,55 +456,3 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
     } 
 }
 }
-
-/*
-
-#include <iostream>
-#include <string>
-#include "parser.h"
-#define KEEP_ALIVE "keep-alive"
-#define CLOSE "close"
-#define CONTENT_LENGTH "content-length"
-#define PROXY_CONNECTION "proxy-connection"
-#define CONNECTION "connection"
-#include <sstream>
-
-
-class HttpRequest {
-public:
-    std::string method;
-    std::string url;
-    std::string HTTP_version;
-    std::map<std::string, std::string> headers;
-    std::string body;
-
-    HttpRequest() {}
-
-};
-
-class HttpResponse {
-public:
-    std::string HTTP_version;
-    std::string status_code;
-    std::string status_message;
-    std::map<std::string, std::string> headers;
-    std::string body;
-
-    HttpResponse() {}
-};
-
-class HttpParser {
-public:
-    HttpParser() : method(HttpMethod::UNDEFINED), state(HttpParserState::IDLE), nread(0) {}
-
-    void init(HttpMethod method) {
-        this->method = method;
-        state = HttpParserState::IDLE;
-        startLine.clear();
-        headers.clear();
-        bodydata.clear();
-        nread = 0;
-    }
-
-    
-*/
