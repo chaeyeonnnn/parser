@@ -12,7 +12,8 @@ enum class Httpparserstate {
     BODY,
     FINISHED,
     PARSER_ERROR,
-    s_dead = 1 
+    s_dead = 1  /*important that this is > 0*/ 
+
   , s_start_req_or_res
   , s_res_or_resp_H
   , s_start_res
@@ -40,7 +41,6 @@ enum class Httpparserstate {
   , s_req_server_start
   , s_req_server
   , s_req_server_with_at
-  , s_req_path
   , s_req_query_string_start
   , s_req_query_string
   , s_req_fragment_start
@@ -60,32 +60,30 @@ enum class Httpparserstate {
 
   , s_header_field_start
   , s_header_field
-  , s_header_value_discard_ws
-  , s_header_value_discard_ws_almost_done
-  , s_header_value_discard_lws
   , s_header_value_start
   , s_header_value
-  , s_header_value_lws
-
   , s_header_almost_done
+  , s_headers_almost_done
 
   , s_chunk_size_start
   , s_chunk_size
   , s_chunk_parameters
   , s_chunk_size_almost_done
 
-  , s_headers_almost_done
-  , s_headers_done
-
   , s_chunk_data
   , s_chunk_data_almost_done
-  , s_chunk_data_done
 
   , s_body_identity
   , s_body_identity_eof
 
   , s_message_done
+  , http_message_needs_eof
+  , http_should_keep_alive
+  , http_body_is_final
+  , http_parser_error
+
 };
+
 
 enum class HttpMessageType {
     REQUEST,
