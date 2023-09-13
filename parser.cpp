@@ -100,8 +100,8 @@ void http_onMessageComplete(){
     std::cout << "Message Complete" << std::endl;
 };
 
-
-struct HttpRequest {
+/* 구조체 다 클래스로 바꿀 것
+class HttpRequest {
   std::string method;
   std::string url;
   std::string HTTP_version;
@@ -110,7 +110,7 @@ struct HttpRequest {
       std::string body;
 };
 
-struct HttpResponse {
+class HttpResponse {
   std::string HTTP_version;
   std::string status_code;
   std::string status_message;
@@ -119,6 +119,7 @@ struct HttpResponse {
       std::string body;
 
 };
+*/
 
 
 // HTTP 파싱 오류 처리 함수
@@ -127,19 +128,19 @@ void Errorhandle(Httpparser *parser, int error) {
         case HPE_OK:
             break;
         case HPE_INVALID_CONTENT_LENGTH:
-            // Content-Length 헤더와 본문 길이가 맞지 않는 경우
+            // 헤더랑 본문 길이 안맞는 경우 헤더 파싱할떄
             fprintf(stderr, "Error: Invalid Content-Length\n");
             break;
         case HPE_CB_message_begin:
-            // 메시지 시작 콜백 오류
+            // 메시지시작 콜백 오류
             fprintf(stderr, "Error: Message Begin Callback Error\n");
             break;
         case HPE_CB_headers_complete:
-            // 헤더 완료 콜백 오류
+            // 헤더완료 콜백 오류
             fprintf(stderr, "Error: Headers Complete Callback Error\n");
             break;
         case HPE_CB_message_complete:
-            // 메시지 완료 콜백 오류
+            // 메시지완료 콜백 오류
             fprintf(stderr, "Error: Message Complete Callback Error\n");
             break;
         case HPE_INVALID_HEADER_TOKEN:
@@ -172,7 +173,7 @@ void http_parser_init(Httpparser *parser, Http_method method){
 
 };
 
-
+// switch 문으로 바꿔?
 Http_method parser_http_method(const std::string& method) {
     if (method == "GET") {
         return Http_method::GET;
@@ -257,10 +258,10 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
     std::string message_type;
         
     if (startLine[0] == 'H'){
-        if (startLine[1]!='E'){
-            message_type = "response";}
-        else
+        if (startLine[1]=='T'){
             message_type = "request";}
+        else
+            message_type = "response";}
     else
         message_type = "response";
     //여기에서 startline 읽고 메시지 유형 결정
@@ -304,14 +305,14 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
     //스타트라인 끝난 위치
 
     const char *message_end = strstr(data, "\r\n\r\n");
-    //message_end : 헤더가 끝난 위치
+    //message_end : 헤더가 끝난 위치 먼저 선언하고
     
     if (message_end != nullptr) {
-        body_mark = message_end + 4; // 여기부터 바디 시작할거야
+        body_mark = message_end + 4; // 헤더 끝난 자리 다음다음부터 바디 시작할
         parser->state = Httpparserstate::HEADERS;
 
-        std::string transferencoding;
-        size_t contentLength = 0;
+        std::string transferencoding; //필드값 저장용, chunked 사용하는지 확인
+        size_t contentLength = 0; //본문 길이 파악
 
         // headers 벡터를 파싱
         const char *header_start = data;
@@ -328,6 +329,8 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
                 Errorhandle(parser, HPE_INVALID_HEADER_TOKEN);
                 return -1;
             }
+            header_start = line_end + 2;
+
             
             // 헤더 필드와 값을 추출
             std::string header_field(header_start, colon - header_start);
@@ -345,17 +348,52 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
             if (header_field == "Transfer-Encoding") {
                 transferencoding = header_value;
             }
-            
             // Content-Length 헤더
             if (header_field == "Content-Length") {
                 contentLength = std::stoul(header_value);
             }
-            header_start = line_end + 2;
-        }
 
-        // 헤더 파싱이 끝나면 바디를 처리합니다.
-        parser->state = Httpparserstate::BODY;
+            // 헤더 파싱이 끝나면 바디 파싱
+            parser->state = Httpparserstate::BODY;
 
+
+            if(header_field == "Content-Length"){
+                if(contentLength > 0) {
+                    // contentLength 변수에 저장된 길이만큼 데이터를 bodydata에서 읽어와서 파싱
+                    std::string body(body_mark, body_mark + contentLength);
+                    http_on_Body(bodydata.c_str(), contentLength);
+                }
+                else {
+                    // Content-Length 값이 0 미만인 경우 오류 처리
+                    Errorhandle(parser, HPE_INVALID_CONTENT_LENGTH);
+                    return -1;
+                }
+            }
+            else if(header_field == "Transfer-Encoding"){
+                if(transferencoding == "chunked") {
+                    // chunked 인코딩을 사용하는 경우 각 청크를 파싱
+                    size_t pos = 0;
+                    while (pos < bodydata.size()) {
+                        // 청크 크기를 파싱하고, 그 크기만큼 데이터를 읽기
+                        size_t chunkSize = std::stoul(bodydata.substr(pos), nullptr, 16);
+                        pos = bodydata.find("\r\n", pos) + 2;  // 청크 크기 뒤의 CRLF를 건너뛰기
+                        if (chunkSize == 0){
+                        http_on_Body(bodydata.c_str(), bodydata.length());
+                        break;
+                        }
+                        std::string chunk = bodydata.substr(pos, chunkSize);
+                        pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
+                        http_on_Body(chunk.c_str(), chunkSize); 
+                        http_onMessageComplete();
+                    }
+                }
+            }
+      
+            else {
+            // Transfer-Encoding이 "chunked"가 아닌 값인 경우는 ..?
+            }
+
+    
         if ((parser->method == Http_method::GET ||
             parser->method == Http_method::HEAD ||
             parser->method == Http_method::DELETE ||
@@ -363,63 +401,62 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
             contentLength > 0) {
             Errorhandle(parser, HPE_INVALID_CONTENT_LENGTH); }
         //바디 없을때, 예를 들어 head나,,, 이런 method
-
-        if (contentLength > 0) {
-          // contentLength 변수에 저장된 길이만큼 데이터를 bodydata에서 읽어와서 파싱
-          std::string body(body_mark, body_mark + contentLength);
-          http_on_Body(bodydata.c_str(), contentLength);
-        }
-        else if (transferencoding == "chunked") {
-          // chunked 인코딩을 사용하는 경우 각 청크를 파싱
-          size_t pos = 0;
-          while (pos < bodydata.size()) {
-              // 청크 크기를 파싱하고, 그 크기만큼 데이터를 읽기
-              size_t chunkSize = std::stoul(bodydata.substr(pos), nullptr, 16);
-              pos = bodydata.find("\r\n", pos) + 2;  // 청크 크기 뒤의 CRLF를 건너뛰기
-              if (chunkSize == 0){
-                http_on_Body(bodydata.c_str(), bodydata.length());
-                break;
-              }
-              std::string chunk = bodydata.substr(pos, chunkSize);
-              pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
-              http_on_Body(chunk.c_str(), chunkSize); 
-              http_onMessageComplete();
-       
-            }
-        }    
+      
         std::cout << "Body:" << std::endl;
         std::cout << bodydata << std::endl;
         
     } 
 }
-
-
-
-int main() 
-{
-    std::string httpMessage =
-    /*
-    "HEAD /test/hi-there HTTP/1.1\r\n"
-    "Host: www.example.com\r\n"
-    "Content-Length: 15\r\n"
-    "\r\n"
-    "This is the body.\r\n"
-    "Hello";
-    */
-    "HTTP/1.1 200 OK\r\n"
-    "Server: MyServer\r\n"
-    "Transfer-Encoding: chunked\r\n"  // Transfer-Encoding 헤더
-    "\r\n"
-    "7\r\n"  
-    "Hello, \r\n"
-    "5\r\n" 
-    "World!\r\n"
-    "0\r\n" 
-    "\r\n";
-    
-    Httpparser parser;
-    http_parser_init(&parser, Http_method::UNDEFINED);
-    http_parser_execute(&parser, nullptr, httpMessage.c_str(), httpMessage.length());
-    
-    return 0;
 }
+
+/*
+
+#include <iostream>
+#include <string>
+#include "parser.h"
+#define KEEP_ALIVE "keep-alive"
+#define CLOSE "close"
+#define CONTENT_LENGTH "content-length"
+#define PROXY_CONNECTION "proxy-connection"
+#define CONNECTION "connection"
+#include <sstream>
+
+
+class HttpRequest {
+public:
+    std::string method;
+    std::string url;
+    std::string HTTP_version;
+    std::map<std::string, std::string> headers;
+    std::string body;
+
+    HttpRequest() {}
+
+};
+
+class HttpResponse {
+public:
+    std::string HTTP_version;
+    std::string status_code;
+    std::string status_message;
+    std::map<std::string, std::string> headers;
+    std::string body;
+
+    HttpResponse() {}
+};
+
+class HttpParser {
+public:
+    HttpParser() : method(HttpMethod::UNDEFINED), state(HttpParserState::IDLE), nread(0) {}
+
+    void init(HttpMethod method) {
+        this->method = method;
+        state = HttpParserState::IDLE;
+        startLine.clear();
+        headers.clear();
+        bodydata.clear();
+        nread = 0;
+    }
+
+    
+*/
