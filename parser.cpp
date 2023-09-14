@@ -360,8 +360,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
         size_t contentLength = 0; //본문 길이 파악
 
         // headers 벡터를 파싱
-        const char *header_start = data;
-      
+        const char *header_start = data + startLine.size() + 2      
         while (header_start < message_end) {
             const char *line_end = strstr(header_start, "\r\n");
             if (line_end == nullptr) {
