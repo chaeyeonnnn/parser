@@ -64,59 +64,59 @@ do {                                                                 \
   }                                                                  \
 } while (0)
 
-
+using namespace std;
 
 void http_on_Message_Begin(){
-    std::cout << "Message Begin" << std::endl;
+    cout << "Message Begin" << endl;
 };
 
 void http_on_Url(const char *url, size_t length){
-    std::cout << "URL: " << std::string(url, length) << std::endl;
+    cout << "URL: " << string(url, length) << endl;
 };
 
 void http_on_status(const char *status, size_t length){
-    std::cout << "status code: " << std::string(status, length) << std::endl;
+    cout << "status code: " << string(status, length) << endl;
 };
 
 void http_on_Header_Field(const char *field, size_t length) {
     std::vector<std::string> header;
     header.emplace_back(field, length);  // field를 벡터에 추가
-    std::cout << "Header Field: " << std::string(field, length) << std::endl;
+    cout << "Header Field: " << string(field, length) << endl;
 };
 
 void http_on_Header_Value( const char *value, size_t length){
-    std::cout << "Header Value: " << std::string(value, length) << std::endl;
+   cout << "Header Value: " << string(value, length) << endl;
 };
 
 void http_on_Headers_Complete(){
-    std::cout << "Headers Complete" << std::endl;
+    cout << "Headers Complete" << endl;
 };
 
 void http_on_Body( const char *body, size_t length){
-    std::cout << "Body: " << std::string(body, length) << std::endl;
+   cout << "Body: " << string(body, length) << endl;
 };
 
 void http_onMessageComplete(){
-    std::cout << "Message Complete" << std::endl;
+    cout << "Message Complete" << endl;
 };
 
 /* 구조체 다 클래스로 바꿀 것
 class HttpRequest {
-  std::string method;
-  std::string url;
-  std::string HTTP_version;
-  std::map<std::string, std::string> headers;
+  string method;
+  string url;
+  string HTTP_version;
+  map<string, string> headers;
   public:
-      std::string body;
+      string body;
 };
 
 class HttpResponse {
-  std::string HTTP_version;
-  std::string status_code;
-  std::string status_message;
-  std::map<std::string, std::string> headers;
+  string HTTP_version;
+  string status_code;
+  string status_message;
+  map<string, string> headers;
   public:
-      std::string body;
+      string body;
 
 };
 */
@@ -246,33 +246,33 @@ Http_method parser_http_method(const std::string& method) {
 }
 
 // 메시지가 오면 startline, header, body 나누는 함수
-void httpdivide(Httpparser& parser, const char *data, std::string& startLine, std::vector<std::string>& headers, std::string& bodydata) {
+void httpdivide(Httpparser& parser, const char *data, string& startLine, vector<string>& headers, string& bodydata) {
     // 빈 줄로 헤더와 본문을 분리
-    size_t headerEnd = std::string(data).find("\r\n\r\n");
+    size_t headerEnd = string(data).find("\r\n\r\n");
     // 다음이 두줄 띄어쓰기 있다? 그게 헤더의 끝
 
-    if (headerEnd != std::string::npos) {
+    if (headerEnd != string::npos) {
         // 시작 라인 추출
-        size_t startLineEnd = std::string(data).find("\r\n");
-        if (startLineEnd != std::string::npos) {
-            startLine = std::string(data).substr(0, startLineEnd);
+        size_t startLineEnd = string(data).find("\r\n");
+        if (startLineEnd != string::npos) {
+            startLine = string(data).substr(0, startLineEnd);
         }
         // 헤더 추출
-        std::string headerSection = std::string(data).substr(startLineEnd + 2, headerEnd - startLineEnd - 2);
+        string headerSection = string(data).substr(startLineEnd + 2, headerEnd - startLineEnd - 2);
         size_t pos = 0; //헤더 필드 시작 위치
-        while (pos != std::string::npos) {
+        while (pos != string::npos) {
             size_t lineEnd = headerSection.find("\r\n", pos);
-            if (lineEnd != std::string::npos) {
+            if (lineEnd != string::npos) {
                 headers.push_back(headerSection.substr(pos, lineEnd - pos));
                 pos = lineEnd + 2;
             } else {
                 // 마지막 헤더
                 headers.push_back(headerSection.substr(pos));
-                pos = std::string::npos;
+                pos = string::npos;
             }
         }
         // 본문 추출
-        bodydata = std::string(data).substr(headerEnd + 4);
+        bodydata = string(data).substr(headerEnd + 4);
     }
 }
 
@@ -291,16 +291,16 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
     http_on_Message_Begin();
 
-    std::string startLine;
-    std::vector<std::string> headers;
-    std::string bodydata;
+    string startLine;
+    vector<string> headers;
+    string bodydata;
 
     httpdivide(*parser, data, startLine, headers, bodydata);
     //여기서 스타트라인-헤더-비디 가르고
 
-    std::cout << "StartLine: " << startLine << std::endl;
+    cout << "StartLine: " << startLine << endl;
 
-    std::string message_type;
+    string message_type;
         
     if (startLine[0] == 'H'){
         if (startLine[1]=='T'){
@@ -311,11 +311,11 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
         message_type = "response";
     //여기에서 startline 읽고 메시지 유형 결정
 
-    std::cout << "Message Type: " << message_type << std::endl;
+    cout << "Message Type: " << message_type << endl;
 
     if (message_type == "request") {
-        std::istringstream stream(startLine);
-        std::string Method, URI, HTTP_version;
+        istringstream stream(startLine);
+        string Method, URI, HTTP_version;
         stream >> Method >> URI >> HTTP_version;
 
         parser->method = parser_http_method(Method);
@@ -323,21 +323,21 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
         url_mark = data + std::string(data).find(URI);
         size_t length = URI.length();
         http_on_Url(URI.c_str(), length);
-        std::cout << "HTTP_version: " << HTTP_version;
+        cout << "HTTP_version: " << HTTP_version;
 
         header_field_mark = data + startLine.size() + 2;
         parser->state = Httpparserstate::HEADERS;
       } 
 
     else {
-        std::istringstream stream(startLine);
-        std::string HTTP_version, Http_status, http_message;
+        istringstream stream(startLine);
+        string HTTP_version, Http_status, http_message;
         stream >> HTTP_version >> Http_status;
-        std::getline(stream,http_message);
+        getline(stream,http_message);
 
         status_mark = data+startLine.find(Http_status);        
         http_on_status(Http_status.c_str(), Http_status.length());
-        std::cout << "http message: " << http_message << std::endl; 
+        cout << "http message: " << http_message << endl; 
 
         header_field_mark = data + startLine.size() + 2; //헤더필드 시작하는 위치
         parser->state = Httpparserstate::HEADERS;
@@ -356,7 +356,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
         body_mark = message_end + 4; // 헤더 끝난 자리 다음다음부터 바디 시작할
         parser->state = Httpparserstate::HEADERS;
 
-        std::string transferencoding; //필드값 저장용, chunked 사용하는지 확인
+        string transferencoding; //필드값 저장용, chunked 사용하는지 확인
         size_t contentLength = 0; //본문 길이 파악
 
         // headers 벡터를 파싱
@@ -378,12 +378,12 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
             
             // 헤더 필드, 값 추출
-            std::string header_field(header_start, colon - header_start);
-            std::string header_value(colon + 1, line_end - colon - 1);
+            string header_field(header_start, colon - header_start);
+            string header_value(colon + 1, line_end - colon - 1);
 
            //공백지워서
-            header_field.erase(std::remove_if(header_field.begin(), header_field.end(), ::isspace), header_field.end());
-            header_value.erase(std::remove_if(header_value.begin(), header_value.end(), ::isspace), header_value.end());
+            header_field.erase(remove_if(header_field.begin(), header_field.end(), ::isspace), header_field.end());
+            header_value.erase(remove_if(header_value.begin(), header_value.end(), ::isspace), header_value.end());
 
             if (!header_field.empty()) {
                 http_on_Header_Field(header_field.c_str(), header_field.length());
@@ -415,7 +415,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
             if (header_field == "Content-Length"){
                 if(contentLength > 0) {
                     // contentLength 변수에 저장된 길이만큼 데이터를 bodydata에서 읽어와서 파싱
-                    std::string body(body_mark, body_mark + contentLength);
+                    string body(body_mark, body_mark + contentLength);
                     http_on_Body(bodydata.c_str(), contentLength);
                 }
                 else {
@@ -433,20 +433,20 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
                     size_t pos = 0;
                     while (pos < bodydata.size()) {
                         // 청크 크기를 파싱하고, 그 크기만큼 데이터를 읽기
-                        size_t chunkSize = std::stoul(bodydata.substr(pos), nullptr, 16);
+                        size_t chunkSize = stoul(bodydata.substr(pos), nullptr, 16);
                         pos = bodydata.find("\r\n", pos) + 2;  // 청크 크기 뒤의 CRLF를 건너뛰기
                         if (chunkSize == 0){
                             break;
                         }
 
                         if (pos + chunkSize <= bodydata.size()) {
-                            std::string chunk = bodydata.substr(pos, chunkSize);
+                            string chunk = bodydata.substr(pos, chunkSize);
                             pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
                             http_on_Body(chunk.c_str(), chunkSize);
                       } else {
                           // 청크 크기가 실제 데이터보다 큰 경우 처리
                           break;
-                        std::string chunk = bodydata.substr(pos, chunkSize);
+                        string chunk = bodydata.substr(pos, chunkSize);
                         pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
                         http_on_Body(chunk.c_str(), chunkSize); 
                         }
@@ -474,7 +474,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
 int main() 
 {
-    std::string httpMessage =
+    string httpMessage =
     "HEAD /test/hi-there HTTP/1.1\r\n"
     "Host: www.example.com\r\n"
     "Content-Length: 15\r\n"
