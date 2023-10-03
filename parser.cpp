@@ -1,4 +1,7 @@
 
+#include <cstring>
+#include <vector>
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include "parser.h"
@@ -66,60 +69,83 @@ do {                                                                 \
 
 using namespace std;
 
-void http_on_Message_Begin(){
+
+class HttpParser
+{
+public:
+    void http_on_Message_Begin();
+    void http_on_Url(const char *url, size_t length);
+    void http_on_status(const char *status, size_t length);
+    void http_on_Header_Field(const char *field, size_t length);
+    void http_on_Header_Value( const char *value, size_t length);
+    void http_on_Headers_Complete();
+    void http_on_Body( const char *body, size_t length);
+    void http_onMessageComplete();
+    Http_method parse_http_Method(const std::string& methodStr);
+    void http_parser_init();
+    int http_parser_execute(Httpparser *parser, HttpParser *settings, const char *data, size_t len);
+private:
+    enum class HttpMessage{
+        REQUEST,
+        RESPONSE
+    };
+    HttpMessage message_type;
+
+    // HTTP 요청
+    struct HttpRequest {
+        string Method;
+        string URI;
+        string Http_version;
+        vector<string> headers;
+        string Body;
+    }http_request;
+    // HTTP 응답
+    struct HttpResponse {
+        string HTTP_version;
+        string Http_status;
+        string http_message;
+        vector<string> headers;
+        string Body;
+    }http_response;
+
+
+};
+
+void HttpParser::http_on_Message_Begin(){
     cout << "Message Begin" << endl;
 };
 
-void http_on_Url(const char *url, size_t length){
+void HttpParser::http_on_Url(const char *url, size_t length){
     cout << "URL: " << string(url, length) << endl;
 };
 
-void http_on_status(const char *status, size_t length){
+void HttpParser::http_on_status(const char *status, size_t length){
     cout << "status code: " << string(status, length) << endl;
 };
 
-void http_on_Header_Field(const char *field, size_t length) {
+void HttpParser::http_on_Header_Field(const char *field, size_t length) {
     std::vector<std::string> header;
     header.emplace_back(field, length);  // field를 벡터에 추가
     cout << "Header Field: " << string(field, length) << endl;
 };
 
-void http_on_Header_Value( const char *value, size_t length){
+void HttpParser::http_on_Header_Value( const char *value, size_t length){
    cout << "Header Value: " << string(value, length) << endl;
 };
 
-void http_on_Headers_Complete(){
+void HttpParser::http_on_Headers_Complete(){
     cout << "Headers Complete" << endl;
 };
 
-void http_on_Body( const char *body, size_t length){
+void HttpParser::http_on_Body( const char *body, size_t length){
    cout << "Body: " << string(body, length) << endl;
 };
 
-void http_onMessageComplete(){
+void HttpParser::http_onMessageComplete(){
     cout << "Message Complete" << endl;
 };
 
-/* 구조체 다 클래스로 바꿀 것
-class HttpRequest {
-  string method;
-  string url;
-  string HTTP_version;
-  map<string, string> headers;
-  public:
-      string body;
-};
-
-class HttpResponse {
-  string HTTP_version;
-  string status_code;
-  string status_message;
-  map<string, string> headers;
-  public:
-      string body;
-
-};
-*/
+//HttpParser::HttpParser(){}
 
 
 // HTTP 파싱 오류 처리 함수
@@ -162,6 +188,19 @@ void Errorhandle(Httpparser *parser, int error) {
     }
 }
 
+
+
+// 1. 일단 다 클래스 형식으로 바꾸기
+// 2. const char --> size_t , int 형식으로 바꿀 것
+// 3. 헤더는 벡터에 key-value 형태로 push, body는 string
+// 4. 콜백으로 startline 끝났을 때 method, uri 들어가기
+// 5. 콜백 header_end 로 끝났을 때 key value 형태로 header 다 들어가기
+// 6. body는 마지막 끝이 오거나 Content-Length or chunk 데이터로 끝 확인
+// 7.끝이 오면 data를 string에 저장하고 끝
+
+
+HttpParser httpparser;
+
 //파서랑 메서드 초기화 때리고
 void http_parser_init(Httpparser *parser, Http_method method){
     parser->state = Httpparserstate::IDLE;
@@ -172,7 +211,6 @@ void http_parser_init(Httpparser *parser, Http_method method){
     parser->nread = 0; // nread 변수 초기화
 
 };
-
 
 /*
 여긴 switch 문으로 바꿔
@@ -277,7 +315,7 @@ void httpdivide(Httpparser& parser, const char *data, string& startLine, vector<
 }
 
 
-int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, const char *data, size_t len){
+int http_parser_execute(Httpparser *parser, HttpParser *settings, const char *data, size_t len){
     char ch;
     int8_t unhex_val; //URL 인코딩됨 문자 해독된 값 저장
     const char *p = data; //문자열 포인터 시작위치로 초기화    
@@ -289,7 +327,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
     Httpparserstate p_state = static_cast<Httpparserstate>(parser->state);
     //파서의 현재 상태,, 지금 어디 처리중인가->형변환 오류 안나게
 
-    http_on_Message_Begin();
+    httpparser.http_on_Message_Begin();
 
     string startLine;
     vector<string> headers;
@@ -322,7 +360,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
         url_mark = data + std::string(data).find(URI);
         size_t length = URI.length();
-        http_on_Url(URI.c_str(), length);
+        httpparser.http_on_Url(URI.c_str(), length);
         cout << "HTTP_version: " << HTTP_version;
 
         header_field_mark = data + startLine.size() + 2;
@@ -336,7 +374,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
         getline(stream,http_message);
 
         status_mark = data+startLine.find(Http_status);        
-        http_on_status(Http_status.c_str(), Http_status.length());
+        httpparser.http_on_status(Http_status.c_str(), Http_status.length());
         cout << "http message: " << http_message << endl; 
 
         header_field_mark = data + startLine.size() + 2; //헤더필드 시작하는 위치
@@ -378,16 +416,16 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 
             
             // 헤더 필드, 값 추출
-            string header_field(header_start, colon - header_start);
+            string header_field(header_start, header_start-colon);
             string header_value(colon + 1, line_end - colon - 1);
 
-           //공백지워서
+            //공백지워서
             header_field.erase(remove_if(header_field.begin(), header_field.end(), ::isspace), header_field.end());
             header_value.erase(remove_if(header_value.begin(), header_value.end(), ::isspace), header_value.end());
 
             if (!header_field.empty()) {
-                http_on_Header_Field(header_field.c_str(), header_field.length());
-                http_on_Header_Value(header_value.c_str(), header_value.length());
+                httpparser.http_on_Header_Field(header_field.c_str(), header_field.length());
+                httpparser.http_on_Header_Value(header_value.c_str(), header_value.length());
             }
             
             // Transfer-Encoding 헤더
@@ -416,7 +454,7 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
                 if(contentLength > 0) {
                     // contentLength 변수에 저장된 길이만큼 데이터를 bodydata에서 읽어와서 파싱
                     string body(body_mark, body_mark + contentLength);
-                    http_on_Body(bodydata.c_str(), contentLength);
+                    httpparser.http_on_Body(bodydata.c_str(), contentLength);
                 }
                 else {
                     // Content-Length 값이 0 미만인 경우 오류
@@ -442,15 +480,15 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
                         if (pos + chunkSize <= bodydata.size()) {
                             string chunk = bodydata.substr(pos, chunkSize);
                             pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
-                            http_on_Body(chunk.c_str(), chunkSize);
+                            httpparser.http_on_Body(chunk.c_str(), chunkSize);
                       } else {
                           // 청크 크기가 실제 데이터보다 큰 경우 처리
                           break;
                         string chunk = bodydata.substr(pos, chunkSize);
                         pos += chunkSize + 2; // 2는 청크 종료를 나타내는 \r\n
-                        http_on_Body(chunk.c_str(), chunkSize); 
+                        httpparser.http_on_Body(chunk.c_str(), chunkSize); 
                         }
-                    http_onMessageComplete();
+                    httpparser.http_onMessageComplete();
 
                 }
                 /*
@@ -475,13 +513,14 @@ int http_parser_execute(Httpparser *parser, const Httpparsersettings *settings, 
 int main() 
 {
     string httpMessage =
+    /*
     "HEAD /test/hi-there HTTP/1.1\r\n"
     "Host: www.example.com\r\n"
     "Content-Length: 15\r\n"
     "\r\n"
     "This is the body.\r\n"
     "Hello";
-    /*
+    */
     "HTTP/1.1 200 OK\r\n"
     "Server: MyServer\r\n"
     "Transfer-Encoding: chunked\r\n"  // Transfer-Encoding 헤더
@@ -492,7 +531,8 @@ int main()
     "World!\r\n"
     "0\r\n" 
     "\r\n";
-    */
+    
+
     Httpparser parser;
     http_parser_init(&parser, Http_method::UNDEFINED);
     http_parser_execute(&parser, nullptr, httpMessage.c_str(), httpMessage.length());
