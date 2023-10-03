@@ -99,6 +99,7 @@ private:
         vector<string> headers;
         string Body;
     }http_request;
+
     // HTTP 응답
     struct HttpResponse {
         string HTTP_version;
@@ -145,7 +146,6 @@ void HttpParser::http_onMessageComplete(){
     cout << "Message Complete" << endl;
 };
 
-//HttpParser::HttpParser(){}
 
 
 // HTTP 파싱 오류 처리 함수
@@ -191,7 +191,7 @@ void Errorhandle(Httpparser *parser, int error) {
 
 
 // 1. 일단 다 클래스 형식으로 바꾸기
-// 2. const char --> size_t , int 형식으로 바꿀 것
+// 2. const char --> size_t , int 형식으로 바꿀 것 
 // 3. 헤더는 벡터에 key-value 형태로 push, body는 string
 // 4. 콜백으로 startline 끝났을 때 method, uri 들어가기
 // 5. 콜백 header_end 로 끝났을 때 key value 형태로 header 다 들어가기
