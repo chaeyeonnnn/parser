@@ -1,4 +1,26 @@
 
+#include <cstring>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include "parser.h"
+#define KEEP_ALIVE "keep-alive"
+#define CLOSE "close"
+#define CONTENT_LENGTH "content-length"
+#define PROXY_CONNECTION "proxy-connection"
+#define CONNECTION "connection"
+#include <sstream>
+
+/*
+#ifndef BIT_AT
+# define BIT_AT(a, i)                                                \
+  (!!((unsigned int) (a)[(unsigned int) (i) >> 3] &                  \
+   (1 << ((unsigned int) (i) & 7))))
+#endif
+*/
+
+
 #define LOWER(c)            (unsigned char)(c | 0x20)
 #define IS_ALPHA(c)         (LOWER(c) >= 'a' && LOWER(c) <= 'z')
 #define IS_NUM(c)           ((c) >= '0' && (c) <= '9')
@@ -360,8 +382,8 @@ int http_parser_execute(Httpparser *parser, HttpParser *settings, const char *da
 
         url_mark = data + std::string(data).find(URI);
         size_t length = URI.length();
-        httpparser.http_on_Url(URI.c_str(), length);
-        cout << "HTTP_version: " << HTTP_version;
+
+        httpparser.http_startline_end(startLine);
 
         header_field_mark = data + startLine.size() + 2;
         parser->state = Httpparserstate::HEADERS;
@@ -373,9 +395,8 @@ int http_parser_execute(Httpparser *parser, HttpParser *settings, const char *da
         stream >> HTTP_version >> Http_status;
         getline(stream,http_message);
 
-        status_mark = data+startLine.find(Http_status);        
-        httpparser.http_on_status(Http_status.c_str(), Http_status.length());
-        cout << "http message: " << http_message << endl; 
+        status_mark = data+startLine.find(Http_status);      
+        httpparser.http_startline_end(startLine);
 
         header_field_mark = data + startLine.size() + 2; //헤더필드 시작하는 위치
         parser->state = Httpparserstate::HEADERS;
