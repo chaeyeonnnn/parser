@@ -149,6 +149,7 @@ void HttpParser::http_startline_end(const string &startLine){
 };
 
 /*
+
 void HttpParser::http_on_Url(const char *url, size_t length){
     cout << "URL: " << string(url, length) << endl;
 };
@@ -372,7 +373,7 @@ int http_parser_execute(Httpparser *parser, HttpParser *settings, const char *da
 
         // headers 벡터를 파싱
 
-        vector<pair<string, string>>headers;
+        vector<pair<string,string>>headers;
 
         //const char *header_start = data + startLine.size() + 2;   
         size_t header_start = data + startLine.size() + 2 - data;
@@ -505,7 +506,6 @@ int main()
     http_parser_execute(&parser, nullptr, httpMessage.c_str(), httpMessage.length());
     return 0;
 }
-
 
 /*
 #include <cstring>
