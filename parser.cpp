@@ -1,4 +1,219 @@
 
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+
+using namespace std;
+
+class HTTPParser {
+public:
+
+    HTTPParser();
+    ~HTTPParser();
+
+    void setHeaderCompleteCallback(void (*headerCompleteCallback)()) {
+        headerCompleteCallback_ = headerCompleteCallback;
+    }
+
+    void setBodyCompleteCallback(void (*bodyCompleteCallback)()) {
+        bodyCompleteCallback_ = bodyCompleteCallback;
+    }
+
+
+    vector<pair<string, string>> requestHeaders;
+    vector<pair<string, string>> responseHeaders;
+
+    string requestMethod;
+    string requestURI;
+    string requestHTTPVersion;
+    //request일떄
+
+    string responseHTTPVersion;
+    string responseStatus;
+    string responseMessage;
+    //response일때
+    
+    
+    void parse(const string& message) {
+        size_t startlineEndpos = message.find("\r\n");
+        // startline 저장
+        if (startlineEndpos != string::npos) {
+            startline = message.substr(0, startlineEndpos);
+        }
+        cout << "startline : " << startline << endl;
+
+        if (startline[0] == 'H'){
+            if (startline[1]=='T'){
+                parseResponse(message);}
+            else
+                parseRequest(message);}
+        else
+            parseResponse(message);
+
+    }
+
+    void parseRequest(const string& message) {
+        requestHeaders.clear();
+        size_t startlineEndpos = message.find("\r\n");
+        // startline 저장
+        if (startlineEndpos != string::npos) {
+            startline = message.substr(0, startlineEndpos);
+        }
+        cout << "startline : " << startline << endl;
+        // 멤버변수로 사용하기
+        istringstream stream(startline);
+        string Method, URI, HTTP_version;
+        stream >> Method >> URI >> HTTP_version;
+
+        cout << "Method, URI, Http_version : " << Method << ", " << URI << ", " << HTTP_version << endl;
+
+        size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
+        if (headerEndPos != string::npos) {
+            string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
+            // 헤더 구간
+            size_t headerstartPos = 0; // 헤더 시작 위치
+            while (headerstartPos != string::npos) {
+                size_t headerlineend = headerSection.find("\r\n", headerstartPos);
+                if (headerlineend != string::npos) {
+                    string headerLine = headerSection.substr(headerstartPos, headerlineend - headerstartPos);
+
+                    size_t colonPos = headerLine.find(": ");
+                    if (colonPos != string::npos) {
+                        string key = headerLine.substr(0, colonPos);
+                        string value = headerLine.substr(colonPos + 2);
+                        requestHeaders.push_back(make_pair(key, value));
+                    }
+                    headerstartPos = headerlineend + 2;
+                } else {
+                    headerstartPos = string::npos;
+                }
+            }
+            if (headerCompleteCallback_) {
+            headerCompleteCallback_();
+        }
+
+            cout << "Request Headers:" << endl;
+            for (const auto& header : requestHeaders) {
+                cout << header.first << ": " << header.second << endl;
+            }
+        }
+        // 헤더 뽑아서 잘 나오나 확인해보고
+        cout << "Request body parsing,,," << endl;
+        string requestBody = message.substr(headerEndPos + 4);
+        cout << "body : " << requestBody << endl;
+        cout << "Request body parsing complete." << endl;
+
+    }
+
+
+    void parseResponse(const string& message) {
+        responseHeaders.clear();
+        
+        size_t startlineEndpos = string(message).find("\r\n");
+        // startline 저장
+        
+        if (startlineEndpos != string::npos){
+            startline = message.substr(0,startlineEndpos);
+        }
+        cout << "startline : " << startline << endl;
+        istringstream stream(startline);
+        string HTTP_version, Http_status, http_message;
+        stream >> HTTP_version >> Http_status;
+        getline(stream, http_message);
+
+        cout << "http version, http_status, http_message : " << HTTP_version<< ", " << Http_status<< ", " << http_message << endl;
+
+        size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
+        if (headerEndPos != string::npos) {
+            string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
+            // 헤더 구간
+            size_t headerstartPos = 0; // 헤더 시작 위치
+            while (headerstartPos != string::npos) {
+                size_t headerlineend = headerSection.find("\r\n", headerstartPos);
+                if (headerlineend != string::npos) {
+                    string headerLine = headerSection.substr(headerstartPos, headerlineend - headerstartPos);
+                    responseHeaders.push_back(make_pair(headerSection.substr(headerstartPos,headerlineend-headerstartPos),""));
+                    headerstartPos = headerlineend+2;
+                    
+                    size_t colonPos = headerLine.find(":");
+                    if (colonPos != string::npos) {
+                        string key = headerLine.substr(0, colonPos);
+                        string value = headerLine.substr(colonPos+1);
+                        responseHeaders.push_back(make_pair(key, value));
+                    }
+                    headerstartPos = headerlineend + 2;
+                } else {
+                    headerstartPos = string::npos;
+                }
+            }
+        if (headerCompleteCallback_) {
+            headerCompleteCallback_();
+        }
+
+        cout << "Response Headers:" << endl;
+        for (const auto& header : responseHeaders) {
+            cout << header.first << ": " << header.second << endl;
+        }
+
+        cout << "Response body parsing..." << endl;
+
+        string responseBody = string(message).substr(headerEndPos + 4);
+        cout << "body : " << responseBody << endl;
+
+
+        cout << "Response body parsing complete." << endl;
+        }
+
+    }
+
+private:
+    void (*headerCompleteCallback_)() = nullptr;
+    void (*bodyCompleteCallback_)() = nullptr;
+    string startline;
+
+};
+
+void onHeaderComplete() {
+    std::cout << "Header processing complete. Triggering an action." << std::endl;
+}
+
+void onBodyComplete() {
+    std::cout << "Body processing complete. Triggering a different action." << std::endl;
+}
+
+HTTPParser::HTTPParser() {
+    cout << "HTTPParser new!" << endl;
+}
+
+HTTPParser::~HTTPParser() {
+    cout << "HTTPParser dead!" << endl;
+}
+
+
+
+int main()
+{
+    HTTPParser parser;
+    parser.setHeaderCompleteCallback(onHeaderComplete);
+    parser.setBodyCompleteCallback(onBodyComplete);
+
+    // HTTP 요청/응답 메시지 고정 
+    string message = "GET /path HTTP/1.1\r\nHost: example.com\r\n\r\nThis is the request body.";
+    // 파싱해볼 예시
+    // httpRequest = "GET /path HTTP/1.1\r\nHost: example.com\r\n\r\nThis is the request body.";
+    // httpResponse = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nThis is the response body.";
+    parser.parse(message);
+    
+    return 0;
+}
+
+
+
+
+
+
+/*
 #include <cstring>
 #include <vector>
 #include <algorithm>
@@ -12,13 +227,13 @@
 #define CONNECTION "connection"
 #include <sstream>
 
-/*
+
 #ifndef BIT_AT
 # define BIT_AT(a, i)                                                \
   (!!((unsigned int) (a)[(unsigned int) (i) >> 3] &                  \
    (1 << ((unsigned int) (i) & 7))))
 #endif
-*/
+
 
 
 #define LOWER(c)            (unsigned char)(c | 0x20)
@@ -507,7 +722,7 @@ int main()
     return 0;
 }
 
-/*
+
 #include <cstring>
 #include <vector>
 #include <algorithm>
