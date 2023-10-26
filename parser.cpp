@@ -1,4 +1,5 @@
 
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -35,7 +36,7 @@ public:
     //response일때
     
     
-    void parse(const string& message) {
+    void parseMessage(const string& message) {
         size_t startlineEndpos = message.find("\r\n");
         // startline 저장
         if (startlineEndpos != string::npos) {
@@ -52,7 +53,7 @@ public:
             parseResponse(message);
 
     }
-
+    // startline, header(host, user-agent, accept ,, ), CRLF , body
     void parseRequest(const string& message) {
         requestHeaders.clear();
         size_t startlineEndpos = message.find("\r\n");
@@ -106,7 +107,7 @@ public:
 
     }
 
-
+    // startline, header(content-type, content-length .. ), CRLF , body
     void parseResponse(const string& message) {
         responseHeaders.clear();
         
@@ -129,6 +130,9 @@ public:
             string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
             // 헤더 구간
             size_t headerstartPos = 0; // 헤더 시작 위치
+            string contentType;  // Content-Type 헤더 값 저장
+            int contentLength = -1; 
+
             while (headerstartPos != string::npos) {
                 size_t headerlineend = headerSection.find("\r\n", headerstartPos);
                 if (headerlineend != string::npos) {
@@ -141,6 +145,13 @@ public:
                         string key = headerLine.substr(0, colonPos);
                         string value = headerLine.substr(colonPos+1);
                         responseHeaders.push_back(make_pair(key, value));
+
+                        if (key == "Content-Type"){
+                            contentType = value;
+                        }
+                        else if (key=="Content-Length"){
+                            contentLength = stoi(value);
+                        } 
                     }
                     headerstartPos = headerlineend + 2;
                 } else {
@@ -203,14 +214,10 @@ int main()
     // 파싱해볼 예시
     // httpRequest = "GET /path HTTP/1.1\r\nHost: example.com\r\n\r\nThis is the request body.";
     // httpResponse = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nThis is the response body.";
-    parser.parse(message);
+    parser.parseMessage(message);
     
     return 0;
 }
-
-
-
-
 
 
 /*
