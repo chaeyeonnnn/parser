@@ -310,11 +310,11 @@ void HTTPParser::parseResponse(const string& message) {
 
 }
 void onHeaderComplete() {
-    std::cout << "Header processing complete. Triggering an action." << std::endl;
+    cout << "Header processing complete. Triggering an action." << endl;
 }
 
 void onBodyComplete() {
-    std::cout << "Body processing complete. Triggering a different action." << std::endl;
+    cout << "Body processing complete. Triggering a different action." << endl;
 }
 
 HTTPParser::HTTPParser() {
