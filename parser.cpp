@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -110,17 +111,39 @@ public:
     
     void parseMessage(const string& message);
     void parseRequest(const string& message);
-    void parseResponse(const string& messgae);
+    void parseResponse(const string& message);
 
     ~HTTPParser();
 
-    
+/*
+private:
+    // parse result
+    http_request
+    http_response
+};
+*/
 
 private:
     void (*headerCompleteCallback_)() = nullptr;
     void (*bodyCompleteCallback_)() = nullptr;
     string startline;
     Method reqmethod;
+
+    struct HttpRequest {
+        string method;
+        string uri;
+        string http_version;
+        vector<pair<string, string>> headers;
+        string body;
+    } http_request;
+
+    struct HttpResponse {
+        string http_version;
+        string http_status;
+        string http_message;
+        vector<pair<string, string>> headers;
+        string body;
+    } http_response;
 
 };
 
@@ -198,6 +221,12 @@ void HTTPParser::parseRequest(const string& message) {
     cout << "body : " << requestBody << endl;
     cout << "Request body parsing complete." << endl;
 
+    http_request.method = to_string(reqmethod);
+    http_request.uri = URI;
+    http_request.http_version = HTTP_version;
+    http_request.headers = requestHeaders;
+    http_request.body = requestBody;
+
     }
 
 // startline, header(content-type, content-length .. ), CRLF , body
@@ -271,6 +300,12 @@ void HTTPParser::parseResponse(const string& message) {
 
 
     cout << "Response body parsing complete." << endl;
+    
+    http_response.http_version = HTTP_version;
+    http_response.http_status = Http_status;
+    http_response.http_message = http_message;
+    http_response.headers = responseHeaders;
+    http_response.body = responseBody;
     }
 
 }
@@ -304,7 +339,6 @@ int main()
     
     return 0;
 }
-
 
 
 /*
