@@ -153,7 +153,7 @@ void HTTPParser::parseMessage(const string& message) {
         else
             parseRequest(message);}
     else
-        parseResponse(message);
+        parseRequest(message);
 
 }
 void HTTPParser::parseRequest(const string& message) {
