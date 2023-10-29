@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -146,7 +145,7 @@ void HTTPParser::parseMessage(const string& message) {
         startline = message.substr(0, startlineEndpos);
     }
     cout << "startline : " << startline << endl;
-
+    
     if (startline[0] == 'H'){
         if (startline[1]=='T'){
             parseResponse(message);}
@@ -193,6 +192,7 @@ void HTTPParser::parseRequest(const string& message) {
                     string key = headerLine.substr(0, colonPos);
                     string value = headerLine.substr(colonPos+2);
                     requestHeaders.push_back(make_pair(key, value));
+                    cout << key << ":" << value << endl;
                 }
                 headerstartPos = headerlineend + 2;
             } else {
@@ -202,16 +202,21 @@ void HTTPParser::parseRequest(const string& message) {
         if (headerCompleteCallback_) {
         headerCompleteCallback_();
     }
-
+       /*
+        // 헤더 뽑아서 잘 나오나 확인해보고
         cout << "Request Headers:" << endl;
         for (const auto& header : requestHeaders) {
             cout << header.first << ": " << header.second << endl;
         }
+        */
     }
-    // 헤더 뽑아서 잘 나오나 확인해보고
     cout << "Request body parsing,,," << endl;
     string requestBody = message.substr(headerEndPos + 4);
     cout << "body : " << requestBody << endl;
+
+    if (bodyCompleteCallback_) {
+        bodyCompleteCallback_();}
+
     cout << "Request body parsing complete." << endl;
 
     http_request.method = to_string(reqmethod);
@@ -225,72 +230,99 @@ void HTTPParser::parseRequest(const string& message) {
 // startline, header(content-type, content-length .. ), CRLF , body
 void HTTPParser::parseResponse(const string& message) {
     responseHeaders.clear();
-    
-    size_t startlineEndpos = string(message).find("\r\n");
-    
-    if (startlineEndpos != string::npos){
-        startline = message.substr(0,startlineEndpos);
+    size_t startlineEndpos = message.find("\r\n");
+    // startline 저장
+    if (startlineEndpos != string::npos) {
+        startline = message.substr(0, startlineEndpos);
     }
     else{
         cerr << "Invalid message format" << endl;
     }
+
     cout << "startline : " << startline << endl;
+    // 멤버변수로 사용하기
     istringstream stream(startline);
     string HTTP_version, Http_status, http_message;
+    stream >> HTTP_version >> Http_status >> http_message;
+    /*
     stream >> HTTP_version >> Http_status;
-    getline(stream, http_message);
+    getline(stream, http_message);*/
 
     cout << "http version, http_status, http_message : " << HTTP_version<< ", " << Http_status<< ", " << http_message << endl;
-
+ 
     size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
-
     if (headerEndPos != string::npos) {
+        string headerSection = message.substr(startlineEndpos + 2, headerEndPos-startlineEndpos-2);
         // 헤더 구간
-        string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
 
         size_t headerstartPos = 0; // 헤더 시작 위치
-        string contentType;  // Content-Type 헤더 값 저장
         int contentLength = -1;
 
-        // 헤더 정보를 한 번에 저장
         while (headerstartPos != string::npos) {
             size_t headerlineend = headerSection.find("\r\n", headerstartPos);
             if (headerlineend != string::npos) {
                 string headerLine = headerSection.substr(headerstartPos, headerlineend - headerstartPos);
-                size_t colonPos = headerLine.find(": ");
+
+                size_t colonPos = headerLine.find(":");
                 if (colonPos != string::npos) {
                     string key = headerLine.substr(0, colonPos);
-                    string value = headerLine.substr(colonPos + 2);
+                    string value = headerLine.substr(colonPos+2);
                     responseHeaders.push_back(make_pair(key, value));
+                    cout << key << ":" << value << endl;
                 }
                 headerstartPos = headerlineend + 2;
-                } else {
-                    headerstartPos = string::npos;
-                    }
-                }
+            } else {
+                headerstartPos = string::npos;
+            }
+        }
         if (headerCompleteCallback_) {
-            headerCompleteCallback_();
-        }
-
-        cout << "Response Headers:" << endl;
-        for (const auto& header : responseHeaders) {
-            cout << header.first << ": " << header.second << endl;
-        }
-
-        cout << "Response body parsing..." << endl;
-
-        string responseBody = string(message).substr(headerEndPos + 4);
-        cout << "body : " << responseBody << endl;
-
-        cout << "Response body parsing complete." << endl;
-
-        http_response.http_version = HTTP_version;
-        http_response.http_status = Http_status;
-        http_response.http_message = http_message;
-        http_response.headers = responseHeaders;
-        http_response.body = responseBody;
+        headerCompleteCallback_();
     }
+/*
+    cout << "Response Headers:" << endl;
+    for (const auto& header : responseHeaders) {
+        cout << header.first << ": " << header.second << endl;
+    }
+    */
+    }
+    cout << "Response body parsing..." << endl;
+    string responseBody;
+    for (const auto& header : responseHeaders){
+        if (header.first == "Content-Length"){
+            int contentLength = stoi(header.second);
+            responseBody = string(message).substr(headerEndPos + 4, contentLength);
+        }
+        else if (header.first == "Transfer-Encoding" && header.second == "chunked"){
+            size_t chunkStartPos = headerEndPos + 4;
+            while (chunkStartPos != string::npos) {
+                int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+                if (chunkSize <= 0) {
+                    break;
+                }
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2; 
+                string chunkData = message.substr(chunkStartPos, chunkSize);
+                responseBody += chunkData;
+                chunkStartPos += chunkSize + 2;
+        }}
+        else{
+            responseBody += message.substr(headerEndPos + 4);
+
+        }
+    }
+    if (bodyCompleteCallback_) {
+    bodyCompleteCallback_();}
+
+    cout << "body : " << responseBody << endl;
+
+    cout << "Response body parsing complete." << endl;
+
+    http_response.http_version = HTTP_version;
+    http_response.http_status = Http_status;
+    http_response.http_message = http_message;
+    http_response.headers = responseHeaders;
+    http_response.body = responseBody;
 }
+
 
 void onHeaderComplete() {
     cout << "Header processing complete. Triggering an action." << endl;
@@ -318,6 +350,7 @@ int main()
 
     // HTTP 요청/응답 메시지 고정 
     string message = "GET /example.html HTTP/1.1\r\nHost: www.example.com\r\nUser-Agent: Mozilla/5.0\r\nAccept-Language: en-US\r\nAccept-Encoding: gzip, deflate\r\nConnection: keep-alive\r\n\r\nThis is the request body.";
+    //string message = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nThis\r\n8\r\n is a test\r\n6\r\n of chunked encoding\r\n0";
     parser.parseMessage(message);
     
     return 0;
