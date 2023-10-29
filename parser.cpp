@@ -115,14 +115,6 @@ public:
 
     ~HTTPParser();
 
-/*
-private:
-    // parse result
-    http_request
-    http_response
-};
-*/
-
 private:
     void (*headerCompleteCallback_)() = nullptr;
     void (*bodyCompleteCallback_)() = nullptr;
@@ -186,19 +178,20 @@ void HTTPParser::parseRequest(const string& message) {
 
     size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
     if (headerEndPos != string::npos) {
-        string headerSection = message.substr(startlineEndpos + 2, headerEndPos);
+        string headerSection = message.substr(startlineEndpos + 2, headerEndPos-startlineEndpos-2);
         // 헤더 구간
 
-        size_t headerstartPos = startlineEndpos+2; // 헤더 시작 위치
+        size_t headerstartPos = 0; // 헤더 시작 위치
+
         while (headerstartPos != string::npos) {
             size_t headerlineend = headerSection.find("\r\n", headerstartPos);
             if (headerlineend != string::npos) {
                 string headerLine = headerSection.substr(headerstartPos, headerlineend - headerstartPos);
 
-                size_t colonPos = headerLine.find(": ");
+                size_t colonPos = headerLine.find(":");
                 if (colonPos != string::npos) {
                     string key = headerLine.substr(0, colonPos);
-                    string value = headerLine.substr(colonPos + 2);
+                    string value = headerLine.substr(colonPos+2);
                     requestHeaders.push_back(make_pair(key, value));
                 }
                 headerstartPos = headerlineend + 2;
@@ -234,7 +227,6 @@ void HTTPParser::parseResponse(const string& message) {
     responseHeaders.clear();
     
     size_t startlineEndpos = string(message).find("\r\n");
-    // startline 저장
     
     if (startlineEndpos != string::npos){
         startline = message.substr(0,startlineEndpos);
@@ -251,64 +243,55 @@ void HTTPParser::parseResponse(const string& message) {
     cout << "http version, http_status, http_message : " << HTTP_version<< ", " << Http_status<< ", " << http_message << endl;
 
     size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
+
     if (headerEndPos != string::npos) {
-        string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
         // 헤더 구간
+        string headerSection = message.substr(startlineEndpos + 2, headerEndPos - startlineEndpos - 2);
 
-        size_t headerstartPos = startlineEndpos+2; // 헤더 시작 위치
+        size_t headerstartPos = 0; // 헤더 시작 위치
         string contentType;  // Content-Type 헤더 값 저장
-        int contentLength = -1; 
+        int contentLength = -1;
 
+        // 헤더 정보를 한 번에 저장
         while (headerstartPos != string::npos) {
             size_t headerlineend = headerSection.find("\r\n", headerstartPos);
             if (headerlineend != string::npos) {
                 string headerLine = headerSection.substr(headerstartPos, headerlineend - headerstartPos);
-                responseHeaders.push_back(make_pair(headerSection.substr(headerstartPos,headerlineend-headerstartPos),""));
-                headerstartPos = headerlineend+2;
-                
-                size_t colonPos = headerLine.find(":");
+                size_t colonPos = headerLine.find(": ");
                 if (colonPos != string::npos) {
                     string key = headerLine.substr(0, colonPos);
-                    string value = headerLine.substr(colonPos+1);
+                    string value = headerLine.substr(colonPos + 2);
                     responseHeaders.push_back(make_pair(key, value));
-
-                    if (key == "Content-Type"){
-                        contentType = value;
-                    }
-                    else if (key=="Content-Length"){
-                        contentLength = stoi(value);
-                    } 
                 }
                 headerstartPos = headerlineend + 2;
-            } else {
-                headerstartPos = string::npos;
-            }
+                } else {
+                    headerstartPos = string::npos;
+                    }
+                }
+        if (headerCompleteCallback_) {
+            headerCompleteCallback_();
         }
-    if (headerCompleteCallback_) {
-        headerCompleteCallback_();
+
+        cout << "Response Headers:" << endl;
+        for (const auto& header : responseHeaders) {
+            cout << header.first << ": " << header.second << endl;
+        }
+
+        cout << "Response body parsing..." << endl;
+
+        string responseBody = string(message).substr(headerEndPos + 4);
+        cout << "body : " << responseBody << endl;
+
+        cout << "Response body parsing complete." << endl;
+
+        http_response.http_version = HTTP_version;
+        http_response.http_status = Http_status;
+        http_response.http_message = http_message;
+        http_response.headers = responseHeaders;
+        http_response.body = responseBody;
     }
-
-    cout << "Response Headers:" << endl;
-    for (const auto& header : responseHeaders) {
-        cout << header.first << ": " << header.second << endl;
-    }
-
-    cout << "Response body parsing..." << endl;
-
-    string responseBody = string(message).substr(headerEndPos + 4);
-    cout << "body : " << responseBody << endl;
-
-
-    cout << "Response body parsing complete." << endl;
-    
-    http_response.http_version = HTTP_version;
-    http_response.http_status = Http_status;
-    http_response.http_message = http_message;
-    http_response.headers = responseHeaders;
-    http_response.body = responseBody;
-    }
-
 }
+
 void onHeaderComplete() {
     cout << "Header processing complete. Triggering an action." << endl;
 }
@@ -334,7 +317,7 @@ int main()
     parser.setBodyCompleteCallback(onBodyComplete);
 
     // HTTP 요청/응답 메시지 고정 
-    string message = "GET /path HTTP/1.1\r\nHost: example.com\r\n\r\nThis is the request body.";
+    string message = "GET /example.html HTTP/1.1\r\nHost: www.example.com\r\nUser-Agent: Mozilla/5.0\r\nAccept-Language: en-US\r\nAccept-Encoding: gzip, deflate\r\nConnection: keep-alive\r\n\r\nThis is the request body.";
     parser.parseMessage(message);
     
     return 0;
