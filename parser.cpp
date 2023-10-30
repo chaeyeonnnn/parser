@@ -320,7 +320,7 @@ void HTTPParser::parseResponse(const string& message) {
             chunkStartPos += chunkSize + 2;
         }
     } else {
-        // Content-Length 및 Transfer-Encoding 헤더가 없을 경우
+        // Content-Length, Transfer-Encoding 헤더가 없는 경우
         responseBody = message.substr(headerEndPos + 4);
     }
     /*
