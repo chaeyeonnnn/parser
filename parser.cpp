@@ -203,6 +203,9 @@ void HTTPParser::parseRequest(const string& message) {
         if (headerCompleteCallback_) {
         headerCompleteCallback_();
     }
+    cout << "RequuestHeaders Size: " << requestHeaders.size() << endl;
+    // 결과 : 4 , 헤더 저장되는 중
+
        /*
         // 헤더 뽑아서 잘 나오나 확인해보고
         cout << "Request Headers:" << endl;
@@ -251,19 +254,19 @@ void HTTPParser::parseResponse(const string& message) {
 
     cout << "http version, http_status, http_message : " << HTTP_version<< ", " << Http_status<< ", " << http_message << endl;
  
-    size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
+
     int contentLength = -1;
     bool hasContentLengthHeader = false;
     bool hasTransferEncodingHeader = false;
 
+    size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
 
     if (headerEndPos != string::npos) {
         string headerSection = message.substr(startlineEndpos + 2, headerEndPos-startlineEndpos-2);
         // 헤더 구간
 
-
         size_t headerstartPos = 0; // 헤더 시작 위치
-        
+
         while (headerstartPos != string::npos) {
             size_t headerlineend = headerSection.find("\r\n", headerstartPos);
             if (headerlineend != string::npos) {
@@ -291,16 +294,22 @@ void HTTPParser::parseResponse(const string& message) {
         }
         if (headerCompleteCallback_) {
         headerCompleteCallback_();
+        }
+        
     }
 
     cout << "Response Headers:" << endl;
     for (const auto& header : responseHeaders) {
         cout << header.first << ": " << header.second << endl;
     }
-    
-    }
+    cout << "ResponseHeaders Size: " << responseHeaders.size() << endl;
+    // 지금 0으로 나옴
+
     cout << "Response body parsing..." << endl;
     string responseBody;
+
+    // content-type : MIME 타입, contemt-length : 본문 길이
+    // 성공 메시지 대신 리다이렉션 
     
     if (hasContentLengthHeader) {
         // Content-Length 헤더가 있을 경우
@@ -320,9 +329,106 @@ void HTTPParser::parseResponse(const string& message) {
             chunkStartPos += chunkSize + 2;
         }
     } else {
-        // Content-Length, Transfer-Encoding 헤더가 없는 경우
+        // Content-Length 및 Transfer-Encoding 헤더가 없을 경우
         responseBody = message.substr(headerEndPos + 4);
     }
+    /*
+    for (const auto& header : responseHeaders){
+        if (header.first == "Content-Length"){
+            int contentLength = stoi(header.second);
+            responseBody = string(message).substr(headerEndPos + 4, contentLength);
+        }
+        else if (header.first == "Transfer-Encoding" && header.second == "chunked"){
+            size_t chunkStartPos = headerEndPos + 4;
+            while (chunkStartPos != string::npos) {
+                int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+                if (chunkSize <= 0) {
+                    break;
+                }
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
+                string chunkData = message.substr(chunkStartPos, chunkSize);
+                responseBody += chunkData;
+                chunkStartPos += chunkSize + 2;
+        }}
+        else{
+            responseBody += message.substr(headerEndPos + 4);
+        }
+        
+
+       if (!responseHeaders.empty()) {
+        if (responseHeaders[-1].first == "Content-Length") {
+            // Content-Length로 처리
+            int contentLength = stoi(responseHeaders[0].second);
+            responseBody = string(message).substr(headerEndPos + 4, contentLength);
+        }
+        else if (responseHeaders[-1].first == "Transfer-Encoding" && responseHeaders[-1].second == "chunked") {
+            // Transfer-Encoding: chunked로 처리
+            size_t chunkStartPos = headerEndPos + 4;
+            while (chunkStartPos != string::npos) {
+                int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+                if (chunkSize <= 0) {
+                    break;
+                }
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
+                string chunkData = message.substr(chunkStartPos, chunkSize);
+                responseBody += chunkData;
+                chunkStartPos += chunkSize + 2;
+            }
+        }
+        else {
+            // 다른 헤더가 있는 경우
+            responseBody = message.substr(headerEndPos + 4);
+        }
+        */
+
+    if (bodyCompleteCallback_) {
+    bodyCompleteCallback_();}
+
+    cout << "body : " << responseBody << endl;
+
+    cout << "Response body parsing complete." << endl;
+
+    http_response.http_version = HTTP_version;
+    http_response.http_status = Http_status;
+    http_response.http_message = http_message;
+    http_response.headers = responseHeaders;
+    http_response.body = responseBody;
+}
+
+
+void onHeaderComplete() {
+    cout << "Header processing complete. Triggering an action." << endl;
+}
+
+void onBodyComplete() {
+    cout << "Body processing complete. Triggering a different action." << endl;
+}
+
+HTTPParser::HTTPParser() {
+    cout << "HTTPParser new!" << endl;
+}
+
+HTTPParser::~HTTPParser() {
+    cout << "HTTPParser dead!" << endl;
+}
+
+
+
+int main()
+{
+    HTTPParser parser;
+    parser.setHeaderCompleteCallback(onHeaderComplete);
+    parser.setBodyCompleteCallback(onBodyComplete);
+
+    // HTTP 요청/응답 메시지 고정 
+    //string message = "GET /example.html HTTP/1.1\r\nHost: www.example.com\r\nUser-Agent: Mozilla/5.0\r\nAccept-Language: en-US\r\nAccept-Encoding: gzip, deflate\r\nConnection: keep-alive\r\n\r\nThis is the request body.";
+    //string message = "HTTP/1.1 200 OK\r\nDate: Sun, 30 Oct 2023 12:00:00 GMT\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nThis\r\n8\r\n is a test\r\n6\r\n of chunked encoding\r\n0";
+    string message = "HTTP/1.1 200 OK\r\nDate: Sun, 30 Oct 2023 12:00:00 GMT\r\nServer: Apache/2.4.38 (Unix)\r\nLast-Modified: Tue, 10 Oct 2023 08:00:00 GMT\r\nContent-Length: 2345\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE html>\r\n<html>\r\n<head>\r\n  <title>Example Page</title>\r\n</head>\r\n<body>\r\n   <p>This is an example web page.</p>\r\n</body>\r\n</html>";
+    parser.parseMessage(message);
+    
+    return 0;
+}
+
     /*
     for (const auto& header : responseHeaders){
         if (header.first == "Content-Length"){
