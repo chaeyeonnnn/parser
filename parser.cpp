@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -213,7 +214,7 @@ void HTTPParser::parseRequest(const string& message) {
     cout << "Request body parsing,,," << endl;
     string requestBody = message.substr(headerEndPos + 4);
     cout << "body : " << requestBody << endl;
-
+    
     if (bodyCompleteCallback_) {
         bodyCompleteCallback_();}
 
@@ -251,13 +252,18 @@ void HTTPParser::parseResponse(const string& message) {
     cout << "http version, http_status, http_message : " << HTTP_version<< ", " << Http_status<< ", " << http_message << endl;
  
     size_t headerEndPos = message.find("\r\n\r\n"); // 헤더 끝나는 위치
+    int contentLength = -1;
+    bool hasContentLengthHeader = false;
+    bool hasTransferEncodingHeader = false;
+
+
     if (headerEndPos != string::npos) {
         string headerSection = message.substr(startlineEndpos + 2, headerEndPos-startlineEndpos-2);
         // 헤더 구간
 
-        size_t headerstartPos = 0; // 헤더 시작 위치
-        int contentLength = -1;
 
+        size_t headerstartPos = 0; // 헤더 시작 위치
+        
         while (headerstartPos != string::npos) {
             size_t headerlineend = headerSection.find("\r\n", headerstartPos);
             if (headerlineend != string::npos) {
@@ -269,6 +275,14 @@ void HTTPParser::parseResponse(const string& message) {
                     string value = headerLine.substr(colonPos+2);
                     responseHeaders.push_back(make_pair(key, value));
                     cout << key << ":" << value << endl;
+
+                    if (key == "Content-Length") {
+                        hasContentLengthHeader = true;
+                        contentLength = stoi(value);
+                    } 
+                    else if (key == "Transfer-Encoding" && value == "chunked") {
+                        hasTransferEncodingHeader = true;
+                    }
                 }
                 headerstartPos = headerlineend + 2;
             } else {
@@ -278,15 +292,38 @@ void HTTPParser::parseResponse(const string& message) {
         if (headerCompleteCallback_) {
         headerCompleteCallback_();
     }
-/*
+
     cout << "Response Headers:" << endl;
     for (const auto& header : responseHeaders) {
         cout << header.first << ": " << header.second << endl;
     }
-    */
+    
     }
     cout << "Response body parsing..." << endl;
     string responseBody;
+    
+    if (hasContentLengthHeader) {
+        // Content-Length 헤더가 있을 경우
+        responseBody = message.substr(headerEndPos + 4, contentLength);
+    } 
+    else if (hasTransferEncodingHeader) {
+        // Transfer-Encoding: chunked 헤더가 있을 경우
+        size_t chunkStartPos = headerEndPos + 4;
+        while (chunkStartPos != string::npos) {
+            int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+            if (chunkSize <= 0) {
+                break;
+            }
+            chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
+            string chunkData = message.substr(chunkStartPos, chunkSize);
+            responseBody += chunkData;
+            chunkStartPos += chunkSize + 2;
+        }
+    } else {
+        // Content-Length 및 Transfer-Encoding 헤더가 없을 경우
+        responseBody = message.substr(headerEndPos + 4);
+    }
+    /*
     for (const auto& header : responseHeaders){
         if (header.first == "Content-Length"){
             int contentLength = stoi(header.second);
@@ -299,16 +336,42 @@ void HTTPParser::parseResponse(const string& message) {
                 if (chunkSize <= 0) {
                     break;
                 }
-                chunkStartPos = message.find("\r\n", chunkStartPos) + 2; 
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
                 string chunkData = message.substr(chunkStartPos, chunkSize);
                 responseBody += chunkData;
                 chunkStartPos += chunkSize + 2;
         }}
         else{
             responseBody += message.substr(headerEndPos + 4);
-
         }
-    }
+        
+
+       if (!responseHeaders.empty()) {
+        if (responseHeaders[-1].first == "Content-Length") {
+            // Content-Length로 처리
+            int contentLength = stoi(responseHeaders[0].second);
+            responseBody = string(message).substr(headerEndPos + 4, contentLength);
+        }
+        else if (responseHeaders[-1].first == "Transfer-Encoding" && responseHeaders[-1].second == "chunked") {
+            // Transfer-Encoding: chunked로 처리
+            size_t chunkStartPos = headerEndPos + 4;
+            while (chunkStartPos != string::npos) {
+                int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+                if (chunkSize <= 0) {
+                    break;
+                }
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
+                string chunkData = message.substr(chunkStartPos, chunkSize);
+                responseBody += chunkData;
+                chunkStartPos += chunkSize + 2;
+            }
+        }
+        else {
+            // 다른 헤더가 있는 경우
+            responseBody = message.substr(headerEndPos + 4);
+        }
+        */
+
     if (bodyCompleteCallback_) {
     bodyCompleteCallback_();}
 
@@ -355,7 +418,6 @@ int main()
     
     return 0;
 }
-
 
 /*
 #include <iostream>
