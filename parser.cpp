@@ -303,7 +303,6 @@ void HTTPParser::parseResponse(const string& message) {
         cout << header.first << ": " << header.second << endl;
     }
     cout << "ResponseHeaders Size: " << responseHeaders.size() << endl;
-    // 지금 0으로 나옴
 
     cout << "Response body parsing..." << endl;
     string responseBody;
@@ -311,32 +310,29 @@ void HTTPParser::parseResponse(const string& message) {
     // content-type : MIME 타입, contemt-length : 본문 길이
     // 성공 메시지 대신 리다이렉션 
     
-    if (reqmethod == Method::HEAD){
-        responseBody = "";
-    }
-    // head 메서드에 대한 응답--> 엔터티 본문 ㄴㄴ
-
-    else if (hasContentLengthHeader) {
-        // Content-Length 헤더가 있을 경우
-        responseBody = message.substr(headerEndPos + 4, contentLength);
-    } 
-    else if (hasTransferEncodingHeader) {
-        // Transfer-Encoding: chunked 헤더가 있을 경우
-        size_t chunkStartPos = headerEndPos + 4;
-        while (chunkStartPos != string::npos) {
-            int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
-            if (chunkSize <= 0) {
-                break;
+    if (hasContentLengthHeader || hasTransferEncodingHeader) {
+        // head 메서드에 대한 응답--> 엔터티 본문 ㄴㄴ
+        if (hasContentLengthHeader) {
+            // Content-Length 헤더가 있을 경우
+            responseBody = message.substr(headerEndPos + 4, contentLength);
+        } 
+        else if (hasTransferEncodingHeader) {
+            // Transfer-Encoding: chunked 헤더가 있을 경우
+            size_t chunkStartPos = headerEndPos + 4;
+            while (chunkStartPos != string::npos) {
+                int chunkSize = strtol(&message[chunkStartPos], nullptr, 16);
+                if (chunkSize <= 0) {
+                    break;
+                }
+                chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
+                string chunkData = message.substr(chunkStartPos, chunkSize);
+                responseBody += chunkData;
+                chunkStartPos += chunkSize + 2;
             }
-            chunkStartPos = message.find("\r\n", chunkStartPos) + 2;
-            string chunkData = message.substr(chunkStartPos, chunkSize);
-            responseBody += chunkData;
-            chunkStartPos += chunkSize + 2;
+        } else {
+            // Content-Length 및 Transfer-Encoding 헤더가 없을 경우
+            responseBody = message.substr(headerEndPos + 4);
         }
-    } else {
-        // Content-Length 및 Transfer-Encoding 헤더가 없을 경우
-        responseBody = message.substr(headerEndPos + 4);
-    }
     /*
     for (const auto& header : responseHeaders){
         if (header.first == "Content-Length"){
@@ -399,6 +395,7 @@ void HTTPParser::parseResponse(const string& message) {
     http_response.headers = responseHeaders;
     http_response.body = responseBody;
 }
+}
 
 
 void onHeaderComplete() {
@@ -433,7 +430,6 @@ int main()
     
     return 0;
 }
-
 
 /*
 #include <iostream>
